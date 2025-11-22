@@ -15,14 +15,17 @@ export default class MainScene extends Scene3D {
 
   create() {
     // add a phaser text
-    const text = this.add.text(this.cameras.main.centerX, 2, 'Controla el cubo rojo con el joystick', { fontSize: 24, color: 'white' })
+    const text = this.add.text(this.cameras.main.centerX, 2, 'Controla el cubo rojo con el joystick', {
+      fontSize: 24,
+      color: 'white'
+    })
     text.setOrigin(0.5, 0)
 
-    // creates a nice scene
-    this.third.warpSpeed()
-
     // adds a controllable red box
-    this.controlledCube = this.third.add.box({ x: 0, y: 2, z: 0, width: 1, height: 1, depth: 1 }, { lambert: { color: 0xff0000 } })
+    this.controlledCube = this.third.add.box(
+      { x: 0, y: 2, z: 0, width: 1, height: 1, depth: 1 },
+      { lambert: { color: 0xff0000 } }
+    )
 
     // adds some reference boxes
     this.third.add.box({ x: 3, y: 2, z: 3 }, { lambert: { color: 0x0000ff } })
@@ -34,7 +37,7 @@ export default class MainScene extends Scene3D {
       y: this.cameras.main.height - 150,
       radius: 80,
       base: this.add.circle(0, 0, 80, 0x888888, 0.5),
-      thumb: this.add.circle(0, 0, 40, 0xcccccc, 0.8),
+      thumb: this.add.circle(0, 0, 40, 0xcccccc, 0.8)
     })
   }
 
