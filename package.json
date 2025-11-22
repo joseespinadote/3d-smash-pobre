@@ -37,7 +37,7 @@
   "license": "MIT",
   "dependencies": {
     "@capacitor/android": "^7.2.0",
-    "@capacitor/core": "^7.2.0",
+    "@capacitor/core": "^7.4.4",
     "@enable3d/phaser-extension": "0.26.1",
     "matter-js": "0.17.1",
     "phaser": "3.88.2",
@@ -46,7 +46,7 @@
     "three": "0.171.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.2.0",
+    "@capacitor/cli": "^7.4.4",
     "@types/node": "^18.14.0",
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^11.0.0",

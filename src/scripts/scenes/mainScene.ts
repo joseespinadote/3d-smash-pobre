@@ -61,7 +61,7 @@ export default class MainScene extends Scene3D {
       punchRange: 3
     })
 
-    // Create enemy cubes with different colors
+    // Create enemy cubes with different colors and AI
     const enemyColors = [
       { color: 0x0000ff, x: 5, z: 5 },   // Blue
       { color: 0x00ff00, x: -5, z: -5 }, // Green
@@ -77,18 +77,28 @@ export default class MainScene extends Scene3D {
         z: config.z,
         size: 1,
         color: config.color,
-        mass: 10
+        mass: 10,
+        isAI: true // Enable AI
       })
+
+      // Configure AI with slightly different behaviors for variety
+      enemy.configureAI({
+        detectionRange: 15,
+        attackRange: 3,
+        moveSpeed: 4 + Math.random() * 2, // Random speed between 4-6
+        aggressiveness: 0.6 + Math.random() * 0.3 // Random aggressiveness 0.6-0.9
+      })
+
       this.enemies.push(enemy)
     })
 
-    // Create virtual joystick for movement
+    // Create virtual joystick for movement (larger and higher up)
     this.joystick = new VirtualJoystick(this, {
-      x: 100,
-      y: this.cameras.main.height - 100,
-      radius: 60,
-      base: this.add.circle(0, 0, 60, 0x888888, 0.5),
-      thumb: this.add.circle(0, 0, 30, 0xcccccc, 0.8)
+      x: 120,
+      y: this.cameras.main.height - 180,
+      radius: 80,
+      base: this.add.circle(0, 0, 80, 0x888888, 0.5),
+      thumb: this.add.circle(0, 0, 40, 0xcccccc, 0.8)
     })
 
     // Create action buttons
@@ -98,7 +108,7 @@ export default class MainScene extends Scene3D {
     const instructions = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.height - 30,
-      'Joystick: Mover | A: Saltar (doble salto) | B: Golpear',
+      'Joystick: Mover | A: Saltar | B: Golpear | ¡Los enemigos atacan!',
       {
         fontSize: '16px',
         color: '#ffffff',
@@ -151,40 +161,44 @@ export default class MainScene extends Scene3D {
   }
 
   /**
-   * Create action buttons for jump and punch
+   * Create action buttons for jump and punch in SNES diagonal layout
    */
   private createActionButtons(): void {
     const screenWidth = this.cameras.main.width
     const screenHeight = this.cameras.main.height
 
-    // Jump button (A)
+    // Diagonal spacing for comfortable thumb reach
+    const buttonRadius = 55
+    const diagonalOffset = 75
+
+    // Button A (Jump) - Upper right position
     this.jumpButton = new ActionButton({
       scene: this,
-      x: screenWidth - 150,
-      y: screenHeight - 100,
-      radius: 50,
+      x: screenWidth - 80,
+      y: screenHeight - 200,
+      radius: buttonRadius,
       label: 'A',
       color: 0x44ff44,
       alpha: 0.6,
       labelColor: '#ffffff',
-      labelSize: 32
+      labelSize: 34
     })
 
     this.jumpButton.onPress(() => {
       this.player.jump()
     })
 
-    // Punch button (B)
+    // Button B (Punch) - Lower left position (diagonal from A)
     this.punchButton = new ActionButton({
       scene: this,
-      x: screenWidth - 50,
-      y: screenHeight - 100,
-      radius: 50,
+      x: screenWidth - 80 - diagonalOffset,
+      y: screenHeight - 200 + diagonalOffset,
+      radius: buttonRadius,
       label: 'B',
       color: 0xff4444,
       alpha: 0.6,
       labelColor: '#ffffff',
-      labelSize: 32
+      labelSize: 34
     })
 
     this.punchButton.onPress(() => {
@@ -195,15 +209,18 @@ export default class MainScene extends Scene3D {
   }
 
   update(_time: number, delta: number): void {
-    // Update player
-    this.player.update()
+    // Collect all players (human + AI) for AI targeting
+    const allPlayers = [this.player, ...this.enemies]
 
-    // Update all enemies
+    // Update player
+    this.player.update(delta, allPlayers)
+
+    // Update all enemies (AI will automatically engage)
     this.enemies.forEach(enemy => {
-      enemy.update()
+      enemy.update(delta, allPlayers)
     })
 
-    // Handle joystick movement
+    // Handle joystick movement for human player only
     const force = this.joystick.force
     if (force > 0) {
       const moveX = this.joystick.right ? 1 : this.joystick.left ? -1 : 0
