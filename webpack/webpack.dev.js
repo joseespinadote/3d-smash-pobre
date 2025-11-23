@@ -1,11 +1,16 @@
-const {merge} = require('webpack-merge')
+const { merge } = require('webpack-merge')
 const common = require('./webpack.common')
 
 const dev = {
   mode: 'development',
   devtool: 'inline-source-map',
   devServer: {
-    open: true
+    host: '0.0.0.0',
+    port: 8080,
+    allowedHosts: 'all',
+    open: true,
+    hot: true,
+    liveReload: true
   }
 }
 
