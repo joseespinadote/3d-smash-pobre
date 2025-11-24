@@ -1,5 +1,7 @@
 import { ExtendedObject3D, THREE } from '@enable3d/phaser-extension'
 
+const punchMultiplier = 1 // Multiplier for punch force to make it more impactful
+
 export interface PlayerConfig {
   scene: any
   x: number
@@ -37,6 +39,11 @@ export default class Player {
   // Movement tracking
   private lastMoveDirection: THREE.Vector3 = new THREE.Vector3(0, 0, 0)
   private isMoving: boolean = false
+
+  // Knockback state
+  private isKnockedBack: boolean = false
+  private knockbackEndTime: number = 0
+  private knockbackDuration: number = 2500 // 2.5 seconds in milliseconds
 
   // AI properties
   private isAI: boolean = false
@@ -89,6 +96,9 @@ export default class Player {
   move(x: number, z: number, speed: number = 5): void {
     if (!this.mesh.body) return
 
+    // Cannot move while knocked back
+    if (this.isKnockedBack) return
+
     const velocity = this.mesh.body.velocity
     this.mesh.body.setVelocity(x * speed, velocity.y, z * speed)
 
@@ -107,6 +117,9 @@ export default class Player {
   jump(): void {
     if (!this.mesh.body) return
 
+    // Cannot jump while knocked back
+    if (this.isKnockedBack) return
+
     if (this.isGrounded) {
       // First jump
       this.mesh.body.setVelocityY(this.jumpForce)
@@ -115,26 +128,25 @@ export default class Player {
     } else if (this.canDoubleJump) {
       // Double jump
       const currentVelocity = this.mesh.body.velocity
-      this.mesh.body.setVelocity(
-        currentVelocity.x,
-        this.doubleJumpForce,
-        currentVelocity.z
-      )
+      this.mesh.body.setVelocity(currentVelocity.x, this.doubleJumpForce, currentVelocity.z)
       this.canDoubleJump = false
     }
   }
 
   /**
    * Punch nearby objects - pushes them in the direction the attacker was moving
-   * Much stronger horizontal push to knock enemies off platforms
+   * Creates a projectile trajectory for the knocked back enemy
    */
   punch(enemies: Player[]): void {
     if (!this.mesh) return
 
+    // Cannot punch while knocked back
+    if (this.isKnockedBack) return
+
     const playerPos = this.mesh.position
     let hitSomething = false
 
-    enemies.forEach(enemy => {
+    enemies.forEach((enemy) => {
       const enemyPos = enemy.getPosition()
       const distance = playerPos.distanceTo(enemyPos)
 
@@ -152,15 +164,20 @@ export default class Player {
           punchDirection.normalize()
         }
 
-        // Much stronger horizontal force to really knock enemies off platforms
-        const horizontalForce = this.punchForce * 5.0 // 5x multiplier = 100 force!
-        const upwardForce = this.punchForce * 0.5     // Small upward boost
+        // Create projectile trajectory: strong horizontal force + moderate upward force
+        // This creates a parabolic arc where the enemy flies backwards
+        const horizontalForce = this.punchForce * punchMultiplier * 1.5 // Increased horizontal
+        const upwardForce = this.punchForce * 0.6 // Reduced vertical for more realistic knockback
 
+        // Apply force in a projectile trajectory
         enemy.applyForce(
           punchDirection.x * horizontalForce,
           upwardForce,
           punchDirection.z * horizontalForce
         )
+
+        // Put enemy in knockback state (stunned, can't control for 2.5 seconds)
+        enemy.setKnockedBack()
 
         // Show hit effect on the enemy
         this.showPunchEffect(enemyPos)
@@ -183,10 +200,26 @@ export default class Player {
   }
 
   /**
+   * Put player in knockback state (can't control movement)
+   */
+  setKnockedBack(): void {
+    this.isKnockedBack = true
+    this.knockbackEndTime = Date.now() + this.knockbackDuration
+
+    // Visual feedback: flash red when knocked back
+    this.flashColor(0xff0000)
+  }
+
+  /**
    * Update player state (call this every frame)
    */
   update(delta: number = 16, allPlayers: Player[] = []): void {
     if (!this.mesh.body) return
+
+    // Check if knockback has expired
+    if (this.isKnockedBack && Date.now() >= this.knockbackEndTime) {
+      this.isKnockedBack = false
+    }
 
     // Check if player is grounded
     const velocity = this.mesh.body.velocity
@@ -200,8 +233,8 @@ export default class Player {
       this.respawn()
     }
 
-    // Update AI
-    if (this.isAI && allPlayers.length > 0) {
+    // Update AI (only if not knocked back)
+    if (this.isAI && !this.isKnockedBack && allPlayers.length > 0) {
       this.updateAI(delta, allPlayers)
     }
   }
@@ -212,11 +245,7 @@ export default class Player {
   respawn(): void {
     if (!this.mesh.body) return
 
-    this.mesh.position.set(
-      this.spawnPosition.x,
-      this.spawnPosition.y,
-      this.spawnPosition.z
-    )
+    this.mesh.position.set(this.spawnPosition.x, this.spawnPosition.y, this.spawnPosition.z)
     this.mesh.body.needUpdate = true
     this.mesh.body.setVelocity(0, 0, 0)
     this.mesh.body.setAngularVelocity(0, 0, 0)
@@ -276,7 +305,7 @@ export default class Player {
     let nearestPlayer: Player | null = null
     let nearestDistance = Infinity
 
-    allPlayers.forEach(player => {
+    allPlayers.forEach((player) => {
       if (player === this) return // Don't target self
 
       const distance = this.mesh.position.distanceTo(player.getPosition())
@@ -308,9 +337,7 @@ export default class Player {
     }
 
     // Calculate direction to target
-    const direction = new THREE.Vector3()
-      .subVectors(targetPos, myPos)
-      .normalize()
+    const direction = new THREE.Vector3().subVectors(targetPos, myPos).normalize()
 
     // Move towards target
     if (distance > this.aiAttackRange) {

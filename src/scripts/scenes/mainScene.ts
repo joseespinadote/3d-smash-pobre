@@ -21,27 +21,9 @@ export default class MainScene extends Scene3D {
   }
 
   create() {
-    // Setup camera
     this.third.camera.position.set(0, 15, 20)
     this.third.camera.lookAt(0, 0, 0)
-
-    // Add lighting with warpSpeed
     this.third.warpSpeed('light')
-
-    // Add title text
-    const text = this.add.text(
-      this.cameras.main.centerX,
-      20,
-      'Smash Bros del Hombre Pobre',
-      {
-        fontSize: '28px',
-        color: '#ffffff',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 4
-      }
-    )
-    text.setOrigin(0.5, 0)
 
     // Create platforms
     this.createPlatforms()
@@ -63,10 +45,10 @@ export default class MainScene extends Scene3D {
 
     // Create enemy cubes with different colors and AI
     const enemyColors = [
-      { color: 0x0000ff, x: 5, z: 5 },   // Blue
+      { color: 0x0000ff, x: 5, z: 5 }, // Blue
       { color: 0x00ff00, x: -5, z: -5 }, // Green
-      { color: 0xffff00, x: 5, z: -5 },  // Yellow
-      { color: 0xff00ff, x: -5, z: 5 }   // Magenta
+      { color: 0xffff00, x: 5, z: -5 }, // Yellow
+      { color: 0xff00ff, x: -5, z: 5 } // Magenta
     ]
 
     enemyColors.forEach((config, index) => {
@@ -94,11 +76,11 @@ export default class MainScene extends Scene3D {
 
     // Create virtual joystick for movement (larger and higher up)
     this.joystick = new VirtualJoystick(this, {
-      x: 120,
-      y: this.cameras.main.height - 180,
-      radius: 80,
-      base: this.add.circle(0, 0, 80, 0x888888, 0.5),
-      thumb: this.add.circle(0, 0, 40, 0xcccccc, 0.8)
+      x: 140,
+      y: this.cameras.main.height - 200,
+      radius: 100,
+      base: this.add.circle(0, 0, 100, 0x888888, 0.5),
+      thumb: this.add.circle(0, 0, 50, 0xcccccc, 0.8)
     })
 
     // Create action buttons
@@ -108,7 +90,7 @@ export default class MainScene extends Scene3D {
     const instructions = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.height - 30,
-      'Joystick: Mover | A: Saltar | B: Golpear | ¡Los enemigos atacan!',
+      'Joystick: Mover | A: Saltar | B: Golpear',
       {
         fontSize: '16px',
         color: '#ffffff',
@@ -138,14 +120,14 @@ export default class MainScene extends Scene3D {
 
     // Additional jumping platforms with varied colors
     const platformConfigs = [
-      { x: 8, y: 3, z: 8, width: 4, depth: 4, color: 0x8b4513 },   // Brown
+      { x: 8, y: 3, z: 8, width: 4, depth: 4, color: 0x8b4513 }, // Brown
       { x: -8, y: 4, z: -8, width: 4, depth: 4, color: 0x2e8b57 }, // Sea green
-      { x: 8, y: 5, z: -8, width: 4, depth: 4, color: 0x4169e1 },  // Royal blue
-      { x: -8, y: 3, z: 8, width: 4, depth: 4, color: 0x9932cc },  // Dark orchid
-      { x: 0, y: 6, z: 0, width: 3, depth: 3, color: 0xff6347 }    // Tomato (center high platform)
+      { x: 8, y: 5, z: -8, width: 4, depth: 4, color: 0x4169e1 }, // Royal blue
+      { x: -8, y: 3, z: 8, width: 4, depth: 4, color: 0x9932cc }, // Dark orchid
+      { x: 0, y: 6, z: 0, width: 3, depth: 3, color: 0xff6347 } // Tomato (center high platform)
     ]
 
-    platformConfigs.forEach(config => {
+    platformConfigs.forEach((config) => {
       const platform = new Platform({
         scene: this,
         x: config.x,
@@ -216,7 +198,7 @@ export default class MainScene extends Scene3D {
     this.player.update(delta, allPlayers)
 
     // Update all enemies (AI will automatically engage)
-    this.enemies.forEach(enemy => {
+    this.enemies.forEach((enemy) => {
       enemy.update(delta, allPlayers)
     })
 
