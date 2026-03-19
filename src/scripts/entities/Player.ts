@@ -230,7 +230,7 @@ export default class Player {
 
     // Check if player fell off the map
     if (this.mesh.position.y < -20) {
-      this.respawn()
+      this.die()
     }
 
     // Update AI (only if not knocked back)
@@ -240,17 +240,79 @@ export default class Player {
   }
 
   /**
-   * Respawn player at spawn position
+   * Handle player death: explode and respawn
+   */
+  die(): void {
+    if (!this.mesh.body) return
+
+    // Show explosion effect at current position (before moving)
+    this.showExplosionEffect(this.mesh.position)
+    
+    // Move to spawn position above center platform
+    this.respawn()
+  }
+
+  /**
+   * Show explosion effect with small particles
+   */
+  private showExplosionEffect(position: THREE.Vector3): void {
+    const particleCount = 12
+    const mesh = this.mesh as any
+    const color = mesh.material.color.getHex()
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = this.scene.third.add.sphere(
+        {
+          x: position.x,
+          y: position.y,
+          z: position.z,
+          radius: 0.2
+        },
+        {
+          lambert: { color: color }
+        }
+      )
+
+      // Add velocity to particles
+      const vx = (Math.random() - 0.5) * 0.4
+      const vy = (Math.random() - 0.5) * 0.4
+      const vz = (Math.random() - 0.5) * 0.4
+
+      // Use Phaser timer for animation instead of requestAnimationFrame
+      this.scene.time.addEvent({
+        delay: 16,
+        repeat: 30,
+        callback: () => {
+          if (particle && particle.position) {
+            particle.position.x += vx
+            particle.position.y += vy
+            particle.position.z += vz
+            particle.scale.multiplyScalar(0.92)
+          }
+        }
+      })
+
+      // Destroy particle after delay
+      this.scene.time.delayedCall(500, () => {
+        this.scene.third.destroy(particle)
+      })
+    }
+  }
+
+  /**
+   * Respawn player at spawn position (above center platform)
    */
   respawn(): void {
     if (!this.mesh.body) return
 
-    this.mesh.position.set(this.spawnPosition.x, this.spawnPosition.y, this.spawnPosition.z)
+    // Reset to center platform position (above tomato platform)
+    this.mesh.position.set(0, 10, 0)
     this.mesh.body.needUpdate = true
     this.mesh.body.setVelocity(0, 0, 0)
     this.mesh.body.setAngularVelocity(0, 0, 0)
     this.isGrounded = false
     this.canDoubleJump = false
+    this.isKnockedBack = false
   }
 
   /**

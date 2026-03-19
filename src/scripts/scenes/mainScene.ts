@@ -1,4 +1,4 @@
-import { Scene3D } from '@enable3d/phaser-extension'
+import { Scene3D, THREE } from '@enable3d/phaser-extension'
 import VirtualJoystick from 'phaser3-rex-plugins/plugins/virtualjoystick'
 import Player from '../entities/Player'
 import Platform from '../entities/Platform'
@@ -28,7 +28,15 @@ export default class MainScene extends Scene3D {
   create() {
     this.third.camera.position.set(0, 15, 20)
     this.third.camera.lookAt(0, 0, 0)
-    this.third.warpSpeed('light')
+    
+    // Set sky blue background
+    this.third.scene.background = new THREE.Color(0x87ceeb)
+    
+    // Setup light and ground
+    this.third.warpSpeed('-ground', 'light') // -ground to not create default floor
+    
+    // Set gravity stronger for snappier jumps (default is -9.8)
+    this.third.physics.setGravity(0, -20, 0)
 
     // Create platforms
     this.createPlatforms()
@@ -42,9 +50,9 @@ export default class MainScene extends Scene3D {
       size: 1,
       color: 0xff0000,
       mass: 10,
-      jumpForce: 10,
-      doubleJumpForce: 6,
-      punchForce: 12, // Slightly adjusted
+      jumpForce: 12, // Adjusted for stronger gravity
+      doubleJumpForce: 8,
+      punchForce: 12,
       punchRange: 3
     })
 
@@ -142,7 +150,7 @@ export default class MainScene extends Scene3D {
       width: 20,
       height: 1,
       depth: 20,
-      color: 0x4a4a4a
+      color: 0x228b22 // Grass green
     })
     this.platforms.push(basePlatform)
 
