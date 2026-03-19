@@ -57,12 +57,12 @@ export default class Platform {
     )
 
     // Set physics properties
-    this.mesh.body.setFriction(0.9)
+    this.mesh.body.setFriction(2) // Increased friction to help moving players
 
     // Make static or kinematic
     if (config.isStatic !== false) {
       if (this.moveDistance > 0) {
-        // Kinematic for moving platforms
+        // Kinematic for moving platforms (collisionFlags 2)
         this.mesh.body.setCollisionFlags(2)
       } else {
         // Static for non-moving
@@ -78,21 +78,28 @@ export default class Platform {
    * Update platform position (oscillatory movement)
    */
   update(delta: number = 16): void {
-    if (this.moveDistance === 0) return
+    if (this.moveDistance === 0 || !this.mesh.body) return
 
+    const prevTime = this.time
     this.time += (delta / 1000) * this.moveSpeed
-    const offset = Math.sin(this.time) * this.moveDistance
-
-    const newX = this.moveAxis === 'x' ? this.initialPosition.x + offset : this.initialPosition.x
-    const newY = this.moveAxis === 'y' ? this.initialPosition.y + offset : this.initialPosition.y
-    const newZ = this.moveAxis === 'z' ? this.initialPosition.z + offset : this.initialPosition.z
-
-    this.mesh.position.set(newX, newY, newZ)
     
-    // For kinematic bodies to affect others, we need to update their physics body
-    if (this.mesh.body) {
-      this.mesh.body.needUpdate = true
+    // Calculate new position
+    const offset = Math.sin(this.time) * this.moveDistance
+    const prevOffset = Math.sin(prevTime) * this.moveDistance
+    
+    // Calculate velocity needed to reach next position
+    // velocity = distance / time
+    const vel = ((offset - prevOffset) * 1000) / delta
+
+    if (this.moveAxis === 'x') {
+      this.mesh.body.setVelocityX(vel)
+    } else if (this.moveAxis === 'y') {
+      this.mesh.body.setVelocityY(vel)
+    } else if (this.moveAxis === 'z') {
+      this.mesh.body.setVelocityZ(vel)
     }
+    
+    this.mesh.body.needUpdate = true
   }
 
   /**

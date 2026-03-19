@@ -26,7 +26,7 @@ export default class MainScene extends Scene3D {
   }
 
   create() {
-    this.third.camera.position.set(0, 15, 20)
+    this.third.camera.position.set(0, 25, 25)
     this.third.camera.lookAt(0, 0, 0)
     
     // Set sky blue background

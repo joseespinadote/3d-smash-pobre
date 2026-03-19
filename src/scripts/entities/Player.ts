@@ -57,6 +57,8 @@ export default class Player {
   private aiLastPunchTime: number = 0
   private aiPunchCooldown: number = 1000 // ms
 
+  private isRespawning: boolean = false
+
   constructor(config: PlayerConfig) {
     this.scene = config.scene
     this.size = config.size || 1
@@ -228,8 +230,8 @@ export default class Player {
       this.canDoubleJump = false
     }
 
-    // Check if player fell off the map
-    if (this.mesh.position.y < -20) {
+    // Check if player fell off the map (Main platform is at y=0, height 1)
+    if (this.mesh.position.y < -10 && !this.isRespawning) {
       this.die()
     }
 
@@ -243,12 +245,14 @@ export default class Player {
    * Handle player death: explode and respawn
    */
   die(): void {
-    if (!this.mesh.body) return
+    if (!this.mesh.body || this.isRespawning) return
 
-    // Show explosion effect at current position (before moving)
+    this.isRespawning = true
+
+    // Show explosion effect at current position
     this.showExplosionEffect(this.mesh.position)
     
-    // Move to spawn position above center platform
+    // Immediate respawn
     this.respawn()
   }
 
@@ -278,7 +282,6 @@ export default class Player {
       const vy = (Math.random() - 0.5) * 0.4
       const vz = (Math.random() - 0.5) * 0.4
 
-      // Use Phaser timer for animation instead of requestAnimationFrame
       this.scene.time.addEvent({
         delay: 16,
         repeat: 30,
@@ -292,7 +295,6 @@ export default class Player {
         }
       })
 
-      // Destroy particle after delay
       this.scene.time.delayedCall(500, () => {
         this.scene.third.destroy(particle)
       })
@@ -305,14 +307,38 @@ export default class Player {
   respawn(): void {
     if (!this.mesh.body) return
 
-    // Reset to center platform position (above tomato platform)
-    this.mesh.position.set(0, 10, 0)
+    // 1. Teleport safely: change to kinematic (2), move, then back to dynamic (0)
+    // This is the most robust way to teleport dynamic bodies in enable3d/ammo.js
+    this.mesh.body.setCollisionFlags(2)
+    
+    // Set position
+    this.mesh.position.set(0, 15, 0)
     this.mesh.body.needUpdate = true
+    
+    // 2. Reset all physics velocities
     this.mesh.body.setVelocity(0, 0, 0)
     this.mesh.body.setAngularVelocity(0, 0, 0)
+    
+    // 3. Reset all gameplay flags
     this.isGrounded = false
     this.canDoubleJump = false
     this.isKnockedBack = false
+    this.lastMoveDirection.set(0, 0, 0)
+    this.isMoving = false
+
+    // 4. Return to dynamic state in the next frame to ensure the position is set
+    this.scene.time.delayedCall(50, () => {
+      if (this.mesh.body) {
+        this.mesh.body.setCollisionFlags(0)
+        this.mesh.body.setVelocity(0, 0, 0)
+        this.mesh.body.setAngularVelocity(0, 0, 0)
+      }
+    })
+
+    // 5. Allow death detection again after a delay
+    this.scene.time.delayedCall(500, () => {
+      this.isRespawning = false
+    })
   }
 
   /**
