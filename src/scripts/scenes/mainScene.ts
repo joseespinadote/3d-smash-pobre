@@ -11,6 +11,10 @@ export default class MainScene extends Scene3D {
   private platforms: Platform[] = []
   private jumpButton!: ActionButton
   private punchButton!: ActionButton
+  private isDesktop: boolean = false
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+  private jumpKey!: Phaser.Input.Keyboard.Key
+  private punchKey!: Phaser.Input.Keyboard.Key
 
   constructor() {
     super({ key: 'MainScene' })
@@ -18,6 +22,7 @@ export default class MainScene extends Scene3D {
 
   init() {
     this.accessThirdDimension()
+    this.isDesktop = this.sys.game.device.os.desktop
   }
 
   create() {
@@ -39,16 +44,16 @@ export default class MainScene extends Scene3D {
       mass: 10,
       jumpForce: 10,
       doubleJumpForce: 6,
-      punchForce: 20,
+      punchForce: 12, // Slightly adjusted
       punchRange: 3
     })
 
     // Create enemy cubes with different colors and AI
     const enemyColors = [
-      { color: 0x0000ff, x: 5, z: 5 }, // Blue
-      { color: 0x00ff00, x: -5, z: -5 }, // Green
-      { color: 0xffff00, x: 5, z: -5 }, // Yellow
-      { color: 0xff00ff, x: -5, z: 5 } // Magenta
+      { color: 0x0000ff, x: 8, z: 8 }, // Blue
+      { color: 0x00ff00, x: -8, z: -8 }, // Green
+      { color: 0xffff00, x: 8, z: -8 }, // Yellow
+      { color: 0xff00ff, x: -8, z: 8 } // Magenta
     ]
 
     enemyColors.forEach((config, index) => {
@@ -74,23 +79,22 @@ export default class MainScene extends Scene3D {
       this.enemies.push(enemy)
     })
 
-    // Create virtual joystick for movement (larger and higher up)
-    this.joystick = new VirtualJoystick(this, {
-      x: 140,
-      y: this.cameras.main.height - 200,
-      radius: 100,
-      base: this.add.circle(0, 0, 100, 0x888888, 0.5),
-      thumb: this.add.circle(0, 0, 50, 0xcccccc, 0.8)
-    })
-
-    // Create action buttons
-    this.createActionButtons()
+    // Setup input
+    if (this.isDesktop) {
+      this.setupKeyboard()
+    } else {
+      this.setupMobileUI()
+    }
 
     // Add controls instructions
+    const instructionText = this.isDesktop 
+      ? 'Flechas: Mover | Z: Saltar | X: Golpear' 
+      : 'Joystick: Mover | A: Saltar | B: Golpear'
+
     const instructions = this.add.text(
       this.cameras.main.centerX,
       this.cameras.main.height - 30,
-      'Joystick: Mover | A: Saltar | B: Golpear',
+      instructionText,
       {
         fontSize: '16px',
         color: '#ffffff',
@@ -99,6 +103,30 @@ export default class MainScene extends Scene3D {
       }
     )
     instructions.setOrigin(0.5, 1)
+  }
+
+  private setupKeyboard(): void {
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys()
+      this.jumpKey = this.input.keyboard.addKey('Z')
+      this.punchKey = this.input.keyboard.addKey('X')
+
+      this.jumpKey.on('down', () => this.player.jump())
+      this.punchKey.on('down', () => this.player.punch(this.enemies))
+    }
+  }
+
+  private setupMobileUI(): void {
+    // Create virtual joystick for movement
+    this.joystick = new VirtualJoystick(this, {
+      x: 140,
+      y: this.cameras.main.height - 200,
+      radius: 100,
+      base: this.add.circle(0, 0, 100, 0x888888, 0.5),
+      thumb: this.add.circle(0, 0, 50, 0xcccccc, 0.8)
+    })
+
+    this.createActionButtons()
   }
 
   /**
@@ -118,28 +146,45 @@ export default class MainScene extends Scene3D {
     })
     this.platforms.push(basePlatform)
 
-    // Additional jumping platforms with varied colors
-    const platformConfigs = [
-      { x: 8, y: 3, z: 8, width: 4, depth: 4, color: 0x8b4513 }, // Brown
-      { x: -8, y: 4, z: -8, width: 4, depth: 4, color: 0x2e8b57 }, // Sea green
-      { x: 8, y: 5, z: -8, width: 4, depth: 4, color: 0x4169e1 }, // Royal blue
-      { x: -8, y: 3, z: 8, width: 4, depth: 4, color: 0x9932cc }, // Dark orchid
-      { x: 0, y: 6, z: 0, width: 3, depth: 3, color: 0xff6347 } // Tomato (center high platform)
-    ]
+    // The "Spawn" platform (reddish center high platform) - Keep it static as requested
+    const spawnPlatform = new Platform({
+      scene: this,
+      x: 0,
+      y: 6,
+      z: 0,
+      width: 3,
+      height: 1,
+      depth: 3,
+      color: 0xff6347 // Tomato
+    })
+    this.platforms.push(spawnPlatform)
 
-    platformConfigs.forEach((config) => {
+    // Additional platforms: smaller, randomized, and moving
+    const colors = [0x8b4513, 0x2e8b57, 0x4169e1, 0x9932cc, 0xffd700, 0xff8c00]
+    
+    for (let i = 0; i < 6; i++) {
+      const x = (Math.random() - 0.5) * 25 // Random X between -12.5 and 12.5
+      const z = (Math.random() - 0.5) * 25 // Random Z
+      const y = 2 + Math.random() * 6 // Random Y height
+
+      const isMoving = Math.random() > 0.3
+      const moveAxis = ['x', 'z'][Math.floor(Math.random() * 2)] as 'x' | 'z'
+
       const platform = new Platform({
         scene: this,
-        x: config.x,
-        y: config.y,
-        z: config.z,
-        width: config.width,
+        x: x,
+        y: y,
+        z: z,
+        width: 2 + Math.random() * 2, // Smaller: 2-4 width
         height: 1,
-        depth: config.depth,
-        color: config.color
+        depth: 2 + Math.random() * 2, // Smaller: 2-4 depth
+        color: colors[i % colors.length],
+        moveDistance: isMoving ? 2 + Math.random() * 3 : 0,
+        moveSpeed: isMoving ? 0.5 + Math.random() * 1.5 : 0,
+        moveAxis: moveAxis
       })
       this.platforms.push(platform)
-    })
+    }
   }
 
   /**
@@ -184,13 +229,14 @@ export default class MainScene extends Scene3D {
     })
 
     this.punchButton.onPress(() => {
-      // Punch all enemies
-      const allCubes = [...this.enemies]
-      this.player.punch(allCubes)
+      this.player.punch(this.enemies)
     })
   }
 
   update(_time: number, delta: number): void {
+    // Update platforms
+    this.platforms.forEach(p => p.update(delta))
+
     // Collect all players (human + AI) for AI targeting
     const allPlayers = [this.player, ...this.enemies]
 
@@ -202,15 +248,36 @@ export default class MainScene extends Scene3D {
       enemy.update(delta, allPlayers)
     })
 
-    // Handle joystick movement for human player only
+    if (this.isDesktop) {
+      this.handleKeyboardMovement()
+    } else {
+      this.handleJoystickMovement()
+    }
+  }
+
+  private handleKeyboardMovement(): void {
+    let moveX = 0
+    let moveZ = 0
+    const speed = 5
+
+    if (this.cursors.left.isDown) moveX = -1
+    else if (this.cursors.right.isDown) moveX = 1
+
+    if (this.cursors.up.isDown) moveZ = -1
+    else if (this.cursors.down.isDown) moveZ = 1
+
+    this.player.move(moveX, moveZ, speed)
+  }
+
+  private handleJoystickMovement(): void {
     const force = this.joystick.force
     if (force > 0) {
       const moveX = this.joystick.right ? 1 : this.joystick.left ? -1 : 0
       const moveZ = this.joystick.down ? 1 : this.joystick.up ? -1 : 0
       this.player.move(moveX, moveZ, 5)
     } else {
-      // Stop horizontal movement when joystick is released
       this.player.move(0, 0, 0)
     }
   }
 }
+

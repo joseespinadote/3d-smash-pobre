@@ -43,7 +43,7 @@ export default class Player {
   // Knockback state
   private isKnockedBack: boolean = false
   private knockbackEndTime: number = 0
-  private knockbackDuration: number = 2500 // 2.5 seconds in milliseconds
+  private knockbackDuration: number = 800 // 0.8 seconds in milliseconds (reduced from 2.5s)
 
   // AI properties
   private isAI: boolean = false
@@ -62,7 +62,7 @@ export default class Player {
     this.size = config.size || 1
     this.jumpForce = config.jumpForce || 8
     this.doubleJumpForce = config.doubleJumpForce || 5
-    this.punchForce = config.punchForce || 15
+    this.punchForce = config.punchForce || 10 // Reduced from 15
     this.punchRange = config.punchRange || 3
     this.isAI = config.isAI || false
 
@@ -166,8 +166,8 @@ export default class Player {
 
         // Create projectile trajectory: strong horizontal force + moderate upward force
         // This creates a parabolic arc where the enemy flies backwards
-        const horizontalForce = this.punchForce * punchMultiplier * 1.5 // Increased horizontal
-        const upwardForce = this.punchForce * 0.6 // Reduced vertical for more realistic knockback
+        const horizontalForce = this.punchForce * punchMultiplier * 0.7 // Reduced from 1.5
+        const upwardForce = this.punchForce * 0.4 // Reduced from 0.6
 
         // Apply force in a projectile trajectory
         enemy.applyForce(
@@ -176,7 +176,7 @@ export default class Player {
           punchDirection.z * horizontalForce
         )
 
-        // Put enemy in knockback state (stunned, can't control for 2.5 seconds)
+        // Put enemy in knockback state (stunned, can't control for 0.8 seconds)
         enemy.setKnockedBack()
 
         // Show hit effect on the enemy
