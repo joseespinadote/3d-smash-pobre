@@ -26,15 +26,12 @@ export default class MainScene extends Scene3D {
   }
 
   create() {
-    this.third.camera.position.set(0, 25, 25)
-    this.third.camera.lookAt(0, 0, 0)
-    
     // Set sky blue background
     this.third.scene.background = new THREE.Color(0x87ceeb)
-    
+
     // Setup light and ground
     this.third.warpSpeed('-ground', 'light') // -ground to not create default floor
-    
+
     // Set gravity stronger for snappier jumps (default is -9.8)
     this.third.physics.setGravity(0, -20, 0)
 
@@ -95,21 +92,16 @@ export default class MainScene extends Scene3D {
     }
 
     // Add controls instructions
-    const instructionText = this.isDesktop 
-      ? 'Flechas: Mover | Z: Saltar | X: Golpear' 
+    const instructionText = this.isDesktop
+      ? 'Flechas: Mover | Z: Saltar | X: Golpear'
       : 'Joystick: Mover | A: Saltar | B: Golpear'
 
-    const instructions = this.add.text(
-      this.cameras.main.centerX,
-      this.cameras.main.height - 30,
-      instructionText,
-      {
-        fontSize: '16px',
-        color: '#ffffff',
-        backgroundColor: '#000000',
-        padding: { x: 10, y: 5 }
-      }
-    )
+    const instructions = this.add.text(this.cameras.main.centerX, this.cameras.main.height - 30, instructionText, {
+      fontSize: '16px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 10, y: 5 }
+    })
     instructions.setOrigin(0.5, 1)
   }
 
@@ -169,7 +161,7 @@ export default class MainScene extends Scene3D {
 
     // Additional platforms: smaller, randomized, and moving
     const colors = [0x8b4513, 0x2e8b57, 0x4169e1, 0x9932cc, 0xffd700, 0xff8c00]
-    
+
     for (let i = 0; i < 6; i++) {
       const x = (Math.random() - 0.5) * 25 // Random X between -12.5 and 12.5
       const z = (Math.random() - 0.5) * 25 // Random Z
@@ -243,7 +235,7 @@ export default class MainScene extends Scene3D {
 
   update(_time: number, delta: number): void {
     // Update platforms
-    this.platforms.forEach(p => p.update(delta))
+    this.platforms.forEach((p) => p.update(delta))
 
     // Collect all players (human + AI) for AI targeting
     const allPlayers = [this.player, ...this.enemies]
@@ -288,4 +280,3 @@ export default class MainScene extends Scene3D {
     }
   }
 }
-
