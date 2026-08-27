@@ -1,25 +1,36 @@
-export default class PreloadScene extends Phaser.Scene {
+import { Scene3D, THREE } from '@enable3d/phaser-extension'
+
+export default class PreloadScene extends Scene3D {
   constructor() {
     super({ key: 'PreloadScene' })
   }
 
-  preload() {}
+  init() {
+    this.accessThirdDimension()
+  }
+
+  async preload() {
+    // Enable THREE cache
+    THREE.Cache.enabled = true
+    
+    console.log('Preloading Knight model...')
+    try {
+      // Load the GLTF model
+      const gltf = await this.third.load.gltf('assets/models/Knight.glb')
+      if (gltf) {
+        // Manually add to THREE.Cache
+        THREE.Cache.add('knight', gltf)
+        console.log('Knight model preloaded and added to THREE.Cache with key "knight"')
+      }
+    } catch (err) {
+      console.error('Error loading Knight model:', err)
+    }
+  }
 
   create() {
-    this.scene.start('MainScene')
-
-    /**
-     * This is how you would dynamically import the mainScene class (with code splitting),
-     * add the mainScene to the Scene Manager
-     * and start the scene.
-     * The name of the chunk would be 'mainScene.chunk.js
-     * Find more about code splitting here: https://webpack.js.org/guides/code-splitting/
-     */
-    // let someCondition = true
-    // if (someCondition)
-    //   import(/* webpackChunkName: "mainScene" */ './mainScene').then(mainScene => {
-    //     this.scene.add('MainScene', mainScene.default, true)
-    //   })
-    // else console.log('The mainScene class will not even be loaded by the browser')
+    // Small delay to ensure cache is ready
+    this.time.delayedCall(100, () => {
+      this.scene.start('MainScene')
+    })
   }
 }

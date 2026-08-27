@@ -70,20 +70,84 @@ export default class Player {
 
     this.spawnPosition = new THREE.Vector3(config.x, config.y, config.z)
 
-    // Create the player mesh with physics
-    this.mesh = this.scene.third.physics.add.box(
-      {
-        x: config.x,
-        y: config.y,
-        z: config.z,
-        width: this.size,
-        height: this.size,
-        depth: this.size
-      },
-      {
-        lambert: { color: config.color || 0xff0000 }
+    // Try to get preloaded Knight model from global THREE cache
+    const knight = THREE.Cache.get('knight')
+    console.log('Player constructor: "knight" model in THREE.Cache?', !!knight)
+    
+    if (knight) {
+      console.log('Knight object keys:', Object.keys(knight))
+      
+      // Defensively get the scene/model
+      // If it's a GLTF result, use .scene. If it's already a Group/Mesh, use it directly.
+      const modelSource = knight.scene || knight
+      
+      if (typeof modelSource.clone !== 'function') {
+        console.error('Knight model source is not clonable!', modelSource)
       }
-    )
+
+      // Create the player mesh from GLTF model
+      const object = modelSource.clone()
+      this.mesh = new ExtendedObject3D()
+      this.mesh.add(object)
+      this.mesh.position.set(config.x, config.y, config.z)
+      
+      // Scaling can be tricky with GLB models. 0.01 - 0.1 is very common.
+      // Adjusting to a size that's clearly visible.
+      this.mesh.scale.set(this.size * 2, this.size * 2, this.size * 2)
+      
+      // Add to scene
+      this.scene.third.add.existing(this.mesh)
+      
+      // Add physics
+      this.scene.third.physics.add.existing(this.mesh, {
+        shape: 'box',
+        width: this.size * 0.8,
+        height: this.size * 1.8,
+        depth: this.size * 0.8,
+        offset: { y: -0.1 }
+      })
+
+      // Setup animations
+      if (knight.animations && knight.animations.length > 0) {
+        knight.animations.forEach((clip: any) => {
+          this.mesh.anims.add(clip.name, clip)
+        })
+        
+        // Some models name it 'idle', others 'Idle', 'Animation', etc.
+        // Try 'Idle' first, then fallback to the first animation
+        const idleAnim = knight.animations.find((a: any) => a.name === 'Idle' || a.name === 'idle')
+        if (idleAnim) {
+          this.mesh.anims.play(idleAnim.name)
+        } else {
+          this.mesh.anims.play(knight.animations[0].name)
+        }
+      }
+
+      // Apply color to the model if possible (e.g. by coloring the mesh materials)
+      if (config.color) {
+        this.mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            // Only apply color if it's not the skin/texture (optional)
+            // child.material.color.setHex(config.color)
+          }
+        })
+      }
+    } else {
+      // Fallback: Create the player mesh as a box if model is not loaded
+      this.mesh = this.scene.third.physics.add.box(
+        {
+          x: config.x,
+          y: config.y,
+          z: config.z,
+          width: this.size,
+          height: this.size,
+          depth: this.size
+        },
+        {
+          lambert: { color: config.color || 0xff0000 }
+        }
+      )
+    }
 
     // Set physics properties
     this.mesh.body.setFriction(0.8)
@@ -230,6 +294,25 @@ export default class Player {
       this.canDoubleJump = false
     }
 
+    // Update animations if it's a model
+    if (this.mesh.anims) {
+      if (this.isKnockedBack) {
+        // You could play a 'Hit' animation here if available
+      } else if (!this.isGrounded) {
+        // You could play a 'Jump' or 'Fall' animation
+      } else if (this.isMoving) {
+        this.mesh.anims.play('Run')
+      } else {
+        this.mesh.anims.play('Idle')
+      }
+    }
+
+    // Rotate model to face movement direction
+    if (this.isMoving && !this.isKnockedBack) {
+      const angle = Math.atan2(this.lastMoveDirection.x, this.lastMoveDirection.z)
+      this.mesh.rotation.y = angle
+    }
+
     // Check if player fell off the map (Main platform is at y=0, height 1)
     if (this.mesh.position.y < -10 && !this.isRespawning) {
       this.die()
@@ -261,8 +344,14 @@ export default class Player {
    */
   private showExplosionEffect(position: THREE.Vector3): void {
     const particleCount = 12
-    const mesh = this.mesh as any
-    const color = mesh.material.color.getHex()
+    let color = 0xff0000 // Default red
+
+    // Try to get color from mesh or its children
+    this.mesh.traverse((child: any) => {
+      if (child.isMesh && child.material && child.material.color) {
+        color = child.material.color.getHex()
+      }
+    })
 
     for (let i = 0; i < particleCount; i++) {
       const particle = this.scene.third.add.sphere(
@@ -325,6 +414,11 @@ export default class Player {
     this.isKnockedBack = false
     this.lastMoveDirection.set(0, 0, 0)
     this.isMoving = false
+
+    // Reset animations if it's a model
+    if (this.mesh.anims) {
+      this.mesh.anims.play('Idle')
+    }
 
     // 4. Return to dynamic state in the next frame to ensure the position is set
     this.scene.time.delayedCall(50, () => {
@@ -505,22 +599,23 @@ export default class Player {
    * Flash the player's color briefly
    */
   private flashColor(color: number): void {
-    const mesh = this.mesh as any
-    if (!mesh.material) return
+    const originalColors: Map<any, number> = new Map()
 
-    // Store original color
-    const originalColor = mesh.material.color ? mesh.material.color.getHex() : 0xffffff
-
-    // Change to flash color
-    if (mesh.material.color) {
-      mesh.material.color.setHex(color)
-    }
-
-    // Restore original color after brief delay
-    setTimeout(() => {
-      if (mesh.material && mesh.material.color) {
-        mesh.material.color.setHex(originalColor)
+    // Store original colors and set flash color
+    this.mesh.traverse((child: any) => {
+      if (child.isMesh && child.material && child.material.color) {
+        originalColors.set(child, child.material.color.getHex())
+        child.material.color.setHex(color)
       }
+    })
+
+    // Restore original colors after brief delay
+    setTimeout(() => {
+      originalColors.forEach((originalColor, child) => {
+        if (child.material && child.material.color) {
+          child.material.color.setHex(originalColor)
+        }
+      })
     }, 100)
   }
 }
