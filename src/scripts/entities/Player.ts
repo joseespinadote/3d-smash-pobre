@@ -1,4 +1,5 @@
 import { ExtendedObject3D, THREE } from '@enable3d/phaser-extension'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 const punchMultiplier = 1 // Multiplier for punch force to make it more impactful
 
@@ -27,6 +28,7 @@ export interface AIConfig {
 export default class Player {
   private scene: any
   private mesh: ExtendedObject3D
+  private visual!: THREE.Object3D
   private size: number
   private jumpForce: number
   private doubleJumpForce: number
@@ -85,26 +87,30 @@ export default class Player {
         console.error('Knight model source is not clonable!', modelSource)
       }
 
-      // Create the player mesh from GLTF model
-      const object = modelSource.clone()
+      // Properly clone SkinnedMesh and Skeleton using Three.js SkeletonUtils
+      const object = SkeletonUtils.clone(modelSource)
+      this.visual = object
+
+      // Scale model appropriately to match world scale (model is 3.44 units tall unscaled)
+      const scale = (this.size || 1) * 0.45
+      this.visual.scale.set(scale, scale, scale)
+      // Align model feet with the bottom of the physics box (box height is 1.5, bottom is y=-0.75)
+      this.visual.position.set(0, -0.25, 0)
+
       this.mesh = new ExtendedObject3D()
-      this.mesh.add(object)
+      this.mesh.add(this.visual)
       this.mesh.position.set(config.x, config.y, config.z)
-      
-      // Scaling can be tricky with GLB models. 0.01 - 0.1 is very common.
-      // Adjusting to a size that's clearly visible.
-      this.mesh.scale.set(this.size * 2, this.size * 2, this.size * 2)
       
       // Add to scene
       this.scene.third.add.existing(this.mesh)
       
-      // Add physics
+      // Add physics matching the scaled character dimensions
       this.scene.third.physics.add.existing(this.mesh, {
         shape: 'box',
-        width: this.size * 0.8,
-        height: this.size * 1.8,
-        depth: this.size * 0.8,
-        offset: { y: -0.1 }
+        width: 0.8,
+        height: 1.5,
+        depth: 0.8,
+        offset: { y: 0 }
       })
 
       // Setup animations
@@ -113,8 +119,6 @@ export default class Player {
           this.mesh.anims.add(clip.name, clip)
         })
         
-        // Some models name it 'idle', others 'Idle', 'Animation', etc.
-        // Try 'Idle' first, then fallback to the first animation
         const idleAnim = knight.animations.find((a: any) => a.name === 'Idle' || a.name === 'idle')
         if (idleAnim) {
           this.mesh.anims.play(idleAnim.name)
@@ -123,30 +127,77 @@ export default class Player {
         }
       }
 
-      // Apply color to the model if possible (e.g. by coloring the mesh materials)
+      // Hide extra shields and weapons so character holds 1 sword and 1 shield cleanly
+      this.visual.traverse((child) => {
+        if (
+          child.name === '2H_Sword' ||
+          child.name === '1H_Sword_Offhand' ||
+          child.name === 'Badge_Shield' ||
+          child.name === 'Rectangle_Shield' ||
+          child.name === 'Spike_Shield'
+        ) {
+          child.visible = false
+        }
+      })
+
+      // Apply distinct color to the model by cloning materials
       if (config.color) {
-        this.mesh.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            // Only apply color if it's not the skin/texture (optional)
-            // child.material.color.setHex(config.color)
+        this.visual.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map((m: any) => {
+                const cloned = m.clone()
+                if (cloned.color) cloned.color.setHex(config.color!)
+                return cloned
+              })
+            } else {
+              child.material = child.material.clone()
+              if (child.material.color) {
+                child.material.color.setHex(config.color)
+              }
+            }
           }
         })
       }
     } else {
       // Fallback: Create the player mesh as a box if model is not loaded
-      this.mesh = this.scene.third.physics.add.box(
-        {
-          x: config.x,
-          y: config.y,
-          z: config.z,
-          width: this.size,
-          height: this.size,
-          depth: this.size
-        },
-        {
-          lambert: { color: config.color || 0xff0000 }
-        }
-      )
+      this.mesh = new ExtendedObject3D()
+      this.mesh.position.set(config.x, config.y, config.z)
+
+      const boxGeo = new THREE.BoxGeometry(this.size, this.size, this.size)
+      const boxMat = new THREE.MeshLambertMaterial({ color: config.color || 0xff0000 })
+      const boxMesh = new THREE.Mesh(boxGeo, boxMat)
+
+      // Add simple face/eyes so movement direction is clear on cubes
+      const eyeGeo = new THREE.BoxGeometry(this.size * 0.15, this.size * 0.15, this.size * 0.1)
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat)
+      leftEye.position.set(-this.size * 0.22, this.size * 0.2, this.size * 0.5)
+      const rightEye = new THREE.Mesh(eyeGeo, eyeMat)
+      rightEye.position.set(this.size * 0.22, this.size * 0.2, this.size * 0.5)
+      boxMesh.add(leftEye)
+      boxMesh.add(rightEye)
+
+      this.visual = boxMesh
+      this.mesh.add(this.visual)
+      this.scene.third.add.existing(this.mesh)
+
+      this.scene.third.physics.add.existing(this.mesh, {
+        shape: 'box',
+        width: this.size,
+        height: this.size,
+        depth: this.size
+      })
+    }
+
+    // If this is the main protagonist (human player), add an overhead marker
+    if (!this.isAI) {
+      const coneGeo = new THREE.ConeGeometry(0.15, 0.35, 4)
+      coneGeo.rotateX(Math.PI) // point downwards
+      const coneMat = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      const indicator = new THREE.Mesh(coneGeo, coneMat)
+      indicator.position.set(0, 1.25, 0)
+      this.mesh.add(indicator)
     }
 
     // Set physics properties
@@ -212,6 +263,15 @@ export default class Player {
     const playerPos = this.mesh.position
     let hitSomething = false
 
+    // Play attack animation if available
+    if (this.mesh.anims) {
+      try {
+        this.mesh.anims.play('1H_Melee_Attack_Slice_Diagonal', 150, false)
+      } catch (_e) {
+        // Fallback if animation not found
+      }
+    }
+
     enemies.forEach((enemy) => {
       const enemyPos = enemy.getPosition()
       const distance = playerPos.distanceTo(enemyPos)
@@ -228,6 +288,10 @@ export default class Player {
           punchDirection.subVectors(enemyPos, playerPos)
           punchDirection.y = 0 // Keep it horizontal
           punchDirection.normalize()
+
+          if (this.visual && punchDirection.lengthSq() > 0.01) {
+            this.visual.rotation.y = Math.atan2(punchDirection.x, punchDirection.z)
+          }
         }
 
         // Create projectile trajectory: strong horizontal force + moderate upward force
@@ -296,21 +360,25 @@ export default class Player {
 
     // Update animations if it's a model
     if (this.mesh.anims) {
+      if (this.mesh.anims.mixer) {
+        this.mesh.anims.mixer.update(delta / 1000)
+      }
+
       if (this.isKnockedBack) {
-        // You could play a 'Hit' animation here if available
+        this.mesh.anims.play('Hit_A', 150, false)
       } else if (!this.isGrounded) {
-        // You could play a 'Jump' or 'Fall' animation
+        this.mesh.anims.play('Jump_Idle', 150, true)
       } else if (this.isMoving) {
-        this.mesh.anims.play('Run')
+        this.mesh.anims.play('Running_A', 150, true)
       } else {
-        this.mesh.anims.play('Idle')
+        this.mesh.anims.play('Idle', 250, true)
       }
     }
 
-    // Rotate model to face movement direction
-    if (this.isMoving && !this.isKnockedBack) {
+    // Rotate visual model to face movement direction
+    if (this.isMoving && !this.isKnockedBack && this.visual) {
       const angle = Math.atan2(this.lastMoveDirection.x, this.lastMoveDirection.z)
-      this.mesh.rotation.y = angle
+      this.visual.rotation.y = angle
     }
 
     // Check if player fell off the map (Main platform is at y=0, height 1)
@@ -400,8 +468,8 @@ export default class Player {
     // This is the most robust way to teleport dynamic bodies in enable3d/ammo.js
     this.mesh.body.setCollisionFlags(2)
     
-    // Set position
-    this.mesh.position.set(0, 15, 0)
+    // Set position to individual spawn position
+    this.mesh.position.set(this.spawnPosition.x, 15, this.spawnPosition.z)
     this.mesh.body.needUpdate = true
     
     // 2. Reset all physics velocities
@@ -414,6 +482,9 @@ export default class Player {
     this.isKnockedBack = false
     this.lastMoveDirection.set(0, 0, 0)
     this.isMoving = false
+    if (this.visual) {
+      this.visual.rotation.y = 0
+    }
 
     // Reset animations if it's a model
     if (this.mesh.anims) {

@@ -29,8 +29,8 @@ export default class MainScene extends Scene3D {
     // Set sky blue background
     this.third.scene.background = new THREE.Color(0x87ceeb)
 
-    // Setup light and ground
-    this.third.warpSpeed('-ground', 'light') // -ground to not create default floor
+    // Setup light and scene without default floor or orbit controls
+    this.third.warpSpeed('-ground', '-orbitControls', 'light')
 
     // Set gravity stronger for snappier jumps (default is -9.8)
     this.third.physics.setGravity(0, -20, 0)
@@ -38,7 +38,7 @@ export default class MainScene extends Scene3D {
     // Create platforms
     this.createPlatforms()
 
-    // Create main player (red cube)
+    // Create main player (red cube/knight protagonist)
     this.player = new Player({
       scene: this,
       x: 0,
@@ -52,6 +52,11 @@ export default class MainScene extends Scene3D {
       punchForce: 12,
       punchRange: 3
     })
+
+    // Initialize camera position focusing directly on the protagonist
+    const initialPos = this.player.getPosition()
+    this.third.camera.position.set(initialPos.x, initialPos.y + 4.5, initialPos.z + 9)
+    this.third.camera.lookAt(initialPos.x, initialPos.y + 0.8, initialPos.z)
 
     // Create enemy cubes with different colors and AI
     const enemyColors = [
@@ -253,6 +258,27 @@ export default class MainScene extends Scene3D {
     } else {
       this.handleJoystickMovement()
     }
+
+    // Camera smoothly follows the protagonist
+    this.updateCamera()
+  }
+
+  private updateCamera(): void {
+    const playerPos = this.player.getPosition()
+    if (!playerPos) return
+
+    // Prevent camera from diving into the abyss when player falls off the platform
+    const clampedY = Math.max(playerPos.y, -2)
+    const targetCamX = playerPos.x
+    const targetCamY = clampedY + 4.5
+    const targetCamZ = playerPos.z + 9
+
+    // Smooth lerp tracking
+    this.third.camera.position.x += (targetCamX - this.third.camera.position.x) * 0.08
+    this.third.camera.position.y += (targetCamY - this.third.camera.position.y) * 0.08
+    this.third.camera.position.z += (targetCamZ - this.third.camera.position.z) * 0.08
+
+    this.third.camera.lookAt(playerPos.x, clampedY + 0.8, playerPos.z)
   }
 
   private handleKeyboardMovement(): void {
